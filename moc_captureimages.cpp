@@ -1,7 +1,7 @@
 /****************************************************************************
 ** Meta object code from reading C++ file 'captureimages.h'
 **
-** Created: Wed Jun 8 11:05:09 2016
+** Created: Wed Jun 8 14:11:17 2016
 **      by: The Qt Meta Object Compiler version 63 (Qt 4.8.1)
 **
 ** WARNING! All changes made in this file will be lost!

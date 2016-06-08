@@ -7,6 +7,7 @@
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/video/video.hpp"
 #include "opencv2/objdetect/objdetect.hpp"
+#include "opencv/cxcore.h"
 
 #include<iostream>
 #include<vector>
@@ -32,15 +33,15 @@ const int CAMERA_HEIGHT = 480;
 #ifdef IMX6
 const string DATABASE_DIR = "/nvdata/config/faces/";
 #else
-const string DATABASE_DIR = "/home/standby/Projects/FacialRecognition/faces/";
+const string DATABASE_DIR = "/home/standby/Projects/FacialRecognition/ProcessedFaces/";
 #endif
 const string EXT = ".png";
-string Name;
+string Name = "";
 const float DETECTION_THRESHOLD = 0.7f;
-const int CONSECUTIVE_THRESHOLD= 8;
+const int CONSECUTIVE_THRESHOLD = 8;
 const int TIMEOUT = 200;
 const int DURATION = 5000;
-const int matchThreshold = 15;
+const int MATCH_THRESHOLD = 15;
 const int ESC_KEY = 27;
 const int ENTER_KEY = 13;
 const int SPACE_KEY = 32;
@@ -65,7 +66,7 @@ int main (int argc, char* argv[])
     if (argc >= 1){
         Name = argv[1];
     }else{
-        cout << "No name supplied - Usage is ./faceRecognition <name>" << endl;
+        cout << "No name supplied - Usage is ./FacialRecognition <name>" << endl;
         return -1;
     }
 
@@ -107,6 +108,7 @@ void initCamera(VideoCapture& capture)
     catch(cv::Exception &e){
         cout << "Error: " << endl;
     }
+    return;
 }
 
 /*
@@ -126,9 +128,7 @@ void detectAndRecognise(VideoCapture &capture, CascadeClassifier& faceCascade, C
     vector<Mat> userFaces;
     Ptr<FaceRecognizer> model;
     vector<Mat> preProcessedFaces;
-    vector<Mat>capturedAndProcessedFaces;
-    vector<int> faceLabels;
-    Mat referenceFace;
+    vector<int> faceLabels;    
     Mat processedImage;
     Mat frame;
     Mat userFace;
@@ -143,8 +143,10 @@ void detectAndRecognise(VideoCapture &capture, CascadeClassifier& faceCascade, C
 
     //Try to load image specified by Name
     //if fail enter loop waiting for enter keypress
+
+/*
     try{
-        referenceFace = imread(databaseImage,1);
+        referenceFace = imread(databaseImage,-1);
     }catch(cv::Exception&e){};
     if (referenceFace.empty()){
         cout << "User : " << Name << " not found, press Enter to add photo" << endl;
@@ -153,14 +155,20 @@ void detectAndRecognise(VideoCapture &capture, CascadeClassifier& faceCascade, C
             imshow("stream", frame);
             char c = waitKey(20);
             if (c == 13){
-                writeImage(frame, Name);
-                referenceFace = imread(databaseImage, 1);
+                Mat processedImage = detection.processImage(image, faceCascade, eyeCascade, eyeGlassCascade);
+                writeImage(processedImage, Name);
+                referenceFace = imread(databaseImage, -1);
                 break;
             }
         }
-    }
+    }*/
+
     //put image through preProcessing - returns a Mat of the face ROI
-    processedImage = detection.processImage(referenceFace, faceCascade, eyeCascade, eyeGlassCascade);
+    //processedImage = detection.processImage(referenceFace, faceCascade, eyeCascade, eyeGlassCascade);
+    try{
+        processedImage = imread(databaseImage, -1);
+    }catch(cv::Exception &e){};
+    cout << "processsedsize: " << toString(processedImage.elemSize()) << endl;
     if(!processedImage.empty()){
         imshow("processed", processedImage);
         //Add the processed face to the array
@@ -178,12 +186,20 @@ void detectAndRecognise(VideoCapture &capture, CascadeClassifier& faceCascade, C
         capture >> frame;
         imshow("stream", frame);
 
+
         if(oldCount != captureImage.count){
             captureImage.startTimer(TIMEOUT, DURATION,  capture, userFaces, true);
             Mat face = userFaces.at(oldCount);
+            QTime time;
+            time.start();
             userFace = detection.processImage(face, faceCascade, eyeCascade, eyeGlassCascade);
             if(!userFace.empty()){  //if processing successful
                 Mat reconstructedFace = faceRecognition.reconstructFace(model, userFace);   //project to pca space
+
+                double size = reconstructedFace.elemSize();
+                cout << "size: " << toString(size) << endl;
+                //size_t size = reconstructedFace.elemSize();
+                //cout << "size: " << toString(size) << endl;
                 similarity = faceRecognition.getSimilarity(userFace, reconstructedFace); //compare with stored images
                 string output;
                 if (similarity < DETECTION_THRESHOLD){
@@ -191,12 +207,14 @@ void detectAndRecognise(VideoCapture &capture, CascadeClassifier& faceCascade, C
                     output = toString(identity);
                     storeFaces(userFace, preProcessedFaces, faceLabels);
                     model = faceRecognition.learnCollectedFaces(preProcessedFaces, faceLabels); //re-train face rec with more matches
+                    int t = time.elapsed();
+                    cout << "time taken: " << t << endl;
                     cout << "matches: " << matches << endl;
                     matches++;
                     consecutive++;
                 }else{
                     cout << "face not recognised" << endl;
-                    consecutive = 0;
+                    consecutive = 0;                    
                 }
             }else{
                 consecutive = 0;
@@ -204,7 +222,7 @@ void detectAndRecognise(VideoCapture &capture, CascadeClassifier& faceCascade, C
             }
             oldCount = captureImage.count;
 
-            if (matches > matchThreshold || consecutive >= CONSECUTIVE_THRESHOLD){
+            if (matches >= MATCH_THRESHOLD || consecutive >= CONSECUTIVE_THRESHOLD){
                 captureImage.endTimer();
                 cout << "Identity: " << Name << " Similarity: " << similarity << " Matches: " << matches << endl;
             }else if(captureImage.done){
@@ -261,7 +279,8 @@ void storeFaces(Mat &processedFace, vector<Mat>& preProcessedFaces, vector<int>&
 void writeImage(Mat &image, string name)
 {
     //set parameters fopr appropriate file formate
-   vector<int> compression_params;
+
+    vector<int> compression_params;
    compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
    compression_params.push_back(9);
    string filename = DATABASE_DIR + name+".png";

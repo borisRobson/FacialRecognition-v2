@@ -74,7 +74,7 @@ Mat recognition::reconstructFace(const Ptr<FaceRecognizer> model, const Mat prep
         Mat reconstructionMat = reconstructionRow.reshape(1, faceHeight);
         //convert to floating point pixels
         Mat reconstructedFace = Mat(reconstructionMat.size(), CV_8U);
-        reconstructionMat.convertTo(reconstructedFace, CV_8U, 1, 0);
+        reconstructionMat.convertTo(reconstructedFace, CV_8U, 1, 0);        
 
         return reconstructedFace;
     } catch(cv::Exception e){

@@ -20,7 +20,7 @@ vector<Mat>faces;
 
 captureImages::captureImages()
 {
-    timer = new QTimer(0);
+    timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(captureImage()));
 }
 
